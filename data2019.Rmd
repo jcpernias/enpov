@@ -69,6 +69,9 @@ db19 <- hogar_2019 %>%
     ## Number of houses
     num_houses = if_else(DISPOSIOV == 6, 1, NUMOVD + 1),
     
+    ## Number of rooms
+    num_rooms = if_else(NHABIT == -9, NA_integer_, NHABIT),
+    
     ## Annual income
     income = 12 * IMPEXAC,
   ) 
