@@ -77,6 +77,15 @@ db19 <- hogar_2019 %>%
     
     ## Dummy for households formed by one parent and their children
     one_parent = TIPHOGAR1 == 4,
+
+    ## Dummy for unemployed primary earner
+    unemployed = SITUACTSP == 3,
+        
+    ## Dummy for primary earner with post-secondary education
+    university = ESTUDREDSP == 4,
+    
+    ## Dummy for house ownership 
+    owner = between(REGTEN, 1, 2),
     
     ## Annual income
     income = 12 * IMPEXAC,
