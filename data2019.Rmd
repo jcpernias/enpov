@@ -22,7 +22,7 @@ library(tidyverse)
 
 Read the 2019 household database: 
 ```{r load-data}
-load("datos/hogar_2019.Rdata")
+load("data/hogar_2019.Rdata")
 ```
 
 Most variables are coded with integers. The main exception is `ACTESTB` that uses single capital letters. The following code chunk:
