@@ -1,0 +1,76 @@
+---
+title: "Data preparation"
+author: "José C. Pernías"
+date: "12/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preliminaries
+
+### Load R packages
+
+```{r r-libraries}
+library(tidyverse)
+```
+
+
+### Load data
+
+Read the 2019 household database: 
+```{r load-data}
+load("datos/hogar_2019.Rdata")
+```
+
+Most variables are coded with integers. The main exception is `ACTESTB` that uses single capital letters. The following code chunk:
+
+- convert `ACTESTB` to a factor variable
+- convert all character variables to integer variables.
+
+```{r transform-char}
+hogar_2019 <- hogar_2019 %>%
+  mutate(ACTESTB = factor(ACTESTB)) %>%
+  mutate(across(where(is.character), as.integer))
+```
+
+
+## Data transformations
+
+### Factor levels
+
+Autonomous communities 3-letter codes:
+```{r ccaa-levels}
+ccaa_levels <- c("AND", "ARA", "AST", "BAL", "CNR", "CNT",
+                 "CYL", "CLM", "CAT", "VAL", "EXT", "GAL",
+                 "MAD", "MUR", "NAV", "PVA", "RIO", 
+                 "CEU", "MEL")
+```
+
+### Transform variables
+
+```{r}
+db19 <- hogar_2019 %>%
+  mutate(
+    ## Autonomous communities
+    ccaa = factor(ccaa_levels[CCAA], levels = ccaa_levels),
+    
+    ## Dummy for rural areas
+    rural = between(ZONARES, 5, 7),
+
+    ## Dummy for buildings older than 25 years
+    old_building = if_else(ANNOCON == -9, NA, ANNOCON == 6),
+
+    ## Dummy for apartment buildings
+    apt_building = if_else(TIPOEDIF == -9, NA, TIPOEDIF > 2),
+    
+    ## Number of houses
+    num_houses = if_else(DISPOSIOV == 6, 1, NUMOVD + 1),
+    
+    ## Annual income
+    income = 12 * IMPEXAC,
+  ) 
+```
+
