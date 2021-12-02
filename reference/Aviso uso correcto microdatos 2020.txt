@@ -1,0 +1,3 @@
+En los ficheros microdato de la EPF del año 2020 hay un hogar en la muestra sin gasto (hogar con NUMERO= 17822), por lo que en el Fichero de Hogar aparecen 19170 hogares, mientras que en el Fichero de Gastos solamente hay 19169. Este hogar, al no tener ningún gasto, no tiene ningún registro en el Fichero de Gastos pero sí está incluido en el Fichero de Hogar (con gasto 0).
+
+Así, para obtener gastos medios por hogar, por persona, etc. se debe tener en cuenta el hogar sin gasto, de forma que para calcular, por ejemplo, el gasto medio por hogar del total nacional habría que tener en cuenta en el cálculo los 19170 hogares del Fichero de Hogar, y no solamente los 19169 del Fichero de Gastos.
