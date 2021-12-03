@@ -117,3 +117,17 @@ db19 <- hogar_2019 %>%
   ) 
 ```
 
+
+```{r}
+db19 %>% filter(income_cu > 0) %>%
+  ggplot(aes(x = income_cu, y = mexpend_cu)) + 
+    geom_point() +
+    scale_x_log10() +
+    scale_y_log10()
+```
+
+```{r}
+mod1 <- lm(log(mexpend_cu) ~ log(income_cu), data = filter(db19, income_cu > 0))
+summary(mod1)
+```
+
