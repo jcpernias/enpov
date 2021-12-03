@@ -72,6 +72,12 @@ db19 <- hogar_2019 %>%
     ## Number of rooms
     num_rooms = if_else(NHABIT == -9, NA_integer_, NHABIT),
     
+    ## Consumption units (OECD definition)
+    cu_oecd = UC1,
+    
+    ## Consumption units (INE definition)
+    cu_ine = UC2,
+    
     ## Dummy for one-person households
     one_person = NMIEMB == 1,
     
@@ -89,6 +95,25 @@ db19 <- hogar_2019 %>%
     
     ## Annual income
     income = 12 * IMPEXAC,
+
+    ## Annual income per consumption unit
+    income_cu = income / cu_oecd,
+
+    ## Weights
+    weight = FACTOR,
+    
+    ## Annual expenditures
+    expend = GASTOT / FACTOR,
+    
+    ## Annual monetary expenditures
+    mexpend = GASTMON / FACTOR,
+    
+    ## Annual expenditures per consumption unit
+    expend_cu = expend / cu_oecd,
+    
+    ## Annual monetary expenditures
+    mexpend_cu = mexpend / cu_oecd,
+  
   ) 
 ```
 
