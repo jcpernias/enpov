@@ -18,7 +18,7 @@ library(tidyverse)
 ```
 
 
-### Load data
+### Load household data
 
 Read the 2019 household database: 
 ```{r load-data}
@@ -34,6 +34,23 @@ Most variables are coded with integers. The main exception is `ACTESTB` that use
 hogar_2019 <- hogar_2019 %>%
   mutate(ACTESTB = factor(ACTESTB)) %>%
   mutate(across(where(is.character), as.integer))
+```
+
+### Load expenditures data
+
+```{r}
+load("data/gastos_2019.Rdata")
+```
+
+
+```{r}
+fuel_exp <-  gastos_2019 %>% 
+  mutate(code2 = str_sub(CODIGO, end = 3),
+         NUMERO = as.integer(NUMERO)) %>% 
+  filter(str_starts(code2, "045")) %>%
+  mutate(expend = if_else(GASTMON == 0, NA_real_, GASTMON / FACTOR)) %>%
+  group_by(NUMERO) %>%
+  summarise(fuel_exp = sum(expend))
 ```
 
 
@@ -115,6 +132,8 @@ db19 <- hogar_2019 %>%
     mexpend_cu = mexpend / cu_oecd,
   
   ) 
+
+db19 <- left_join(db19, fuel_exp, by = "NUMERO")
 ```
 
 
