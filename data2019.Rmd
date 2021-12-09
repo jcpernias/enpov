@@ -1,64 +1,75 @@
 ---
-title: "Data preparation"
+title: "Datos 2019"
 author: "José C. Pernías"
 date: "12/2/2021"
 output: html_document
+lang: "es"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Preliminaries
+## Preliminares
 
-### Load R packages
+### Paquetes R
+
+Carga los paquetes:
+
+- `tidyverse`: bases de datos y gráficos.
+- `sandwich`: estimación robusta de covarianzas de los estimadores.
+- `lmtest`: contraste de hipótesis.
+
 
 ```{r r-libraries}
 library(tidyverse)
+library(sandwich)
+library(lmtest)
 ```
 
 
-### Load household data
+### Lectura de las bases de datos originales
 
-Read the 2019 household database: 
-```{r load-data}
+Lee la base de datos de hogares del año 2019, `hogar_2019`:
+```{r hh-load-data}
 load("data/hogar_2019.Rdata")
 ```
 
-Most variables are coded with integers. The main exception is `ACTESTB` that uses single capital letters. The following code chunk:
+Muchas variables de esta base de datos son caracteres pero contienen enteros. 
+La única excepción es `ACTESTB` que usa una letra mayúscula o `-9`. El siguiente código:
 
-- convert `ACTESTB` to a factor variable
-- convert all character variables to integer variables.
+- convierte `ACTESTB` a una variable factor;
+- convierte las restantes variables de caracteres a variables numéricas.
 
-```{r transform-char}
+```{r hh-char-to-int}
 hogar_2019 <- hogar_2019 %>%
   mutate(ACTESTB = factor(ACTESTB)) %>%
   mutate(across(where(is.character), as.integer))
 ```
 
-### Load expenditures data
-
-```{r}
+Lee la base de datos de gastos, `gastos_2019`:
+```{r expend-load-data}
 load("data/gastos_2019.Rdata")
 ```
 
+En esta base de datos sólo hay tres variables de caracteres. Se convierten a enteros `ANOENC`, el año en que se recogen los datos, y `NUMERO`, el código que identifica a cada familia. La variable `CODIGO` contiene los códigos ECOICOP de cada partida de gasto. Se crean nuevas variables con códigos de 2, 3, 4 y 5 dígitos:
 
-```{r}
-fuel_exp <-  gastos_2019 %>% 
-  mutate(code2 = str_sub(CODIGO, end = 3),
-         NUMERO = as.integer(NUMERO)) %>% 
-  filter(str_starts(code2, "045")) %>%
-  mutate(expend = if_else(GASTMON == 0, NA_real_, GASTMON / FACTOR)) %>%
-  group_by(NUMERO) %>%
-  summarise(fuel_exp = sum(expend))
+```{r expend-char-to-int}
+gastos_2019 <- gastos_2019 %>% 
+  mutate(ANOENC = as.integer(ANOENC),
+         NUMERO = as.integer(NUMERO), 
+         code2 = str_sub(CODIGO, end = 2),
+         code3 = str_sub(CODIGO, end = 3),
+         code4 = str_sub(CODIGO, end = 4),
+         code5 = str_sub(CODIGO, end = 5))
 ```
 
 
-## Data transformations
+## Transformaciones de las variables
 
-### Factor levels
+### Niveles de las variables factor
 
-Autonomous communities 3-letter codes:
+Códigos de 3 letras para las Comunidades Autónomas:
 ```{r ccaa-levels}
 ccaa_levels <- c("AND", "ARA", "AST", "BAL", "CNR", "CNT",
                  "CYL", "CLM", "CAT", "VAL", "EXT", "GAL",
@@ -66,87 +77,184 @@ ccaa_levels <- c("AND", "ARA", "AST", "BAL", "CNR", "CNT",
                  "CEU", "MEL")
 ```
 
-### Transform variables
+### Base de datos de hogares
 
-```{r}
-db19 <- hogar_2019 %>%
+A partir de las variables originales de la base de datos de hogares se construyen las siguientes variables:
+
+- `ccaa`: Comunidad Autónoma de residencia del hogar; factor. 
+- `rural`: `TRUE` si el hogar reside en un entorno rural; lógica.
+- `old_building`: `TRUE` si la vivienda se construyó hace más de 25 años; lógica.
+- `apt_building`: `TRUE` si la vivienda se encuentra en un edificio de apartamentos; lógica.
+- `num_houses`: número de viviendas que tiene el hogar a su disposición; numérica.
+- `cu_oecd`: unidades de consumo en el hogar, escala OCDE; numérica.
+- `cu_ine`: unidades de consumo en el hogar, escala OCDE modificada; numérica.
+- `one_person`: `TRUE` si el hogar está compuesto por una única persona; lógica.
+- `one_parent`: `TRUE` si el hogar está compuesto por un adulto y sus hijos menores de 16 años; lógica.
+- `unemployed`: `TRUE` si el sustentador principal está desempleado; lógica.
+- `university`: `TRUE` si el sustentador principal completó estudios universitarios; lógica.
+- `owner`: `TRUE` si la vivienda pertenece a la familia; lógica.
+- `income`: ingresos monetarios anualizados de la familia; numérica.
+- `income_cu`: ingresos monetarios anualizados por unidad de consumo.
+- `weight`: factor de elevación poblacional: número de familias a las que representa cada familia que participó en la encuesta; numérica.
+- `expend`: gasto total anualizado de la familia; numérica.
+- `mexpend`: gasto monetario total de la familia; numérica.
+- `expend_cu`: gasto total anualizado de la familia por unidad de consumo; numérica.
+- `mexpend_cu`: gasto monetario total de la familia por unidad de consumo; numérica.
+
+
+```{r hh-transf}
+hh19 <- hogar_2019 %>%
   mutate(
-    ## Autonomous communities
+    ## Comunidades autónomas
     ccaa = factor(ccaa_levels[CCAA], levels = ccaa_levels),
     
-    ## Dummy for rural areas
+    ## Ficticia para áreas rurales
     rural = between(ZONARES, 5, 7),
 
-    ## Dummy for buildings older than 25 years
+    ## Ficticia: edificios con más de 25 años
     old_building = if_else(ANNOCON == -9, NA, ANNOCON == 6),
 
-    ## Dummy for apartment buildings
+    ## Ficticia: piso e edificio de apartamentos
     apt_building = if_else(TIPOEDIF == -9, NA, TIPOEDIF > 2),
     
-    ## Number of houses
+    ## Número de viviendas 
     num_houses = if_else(DISPOSIOV == 6, 1, NUMOVD + 1),
     
-    ## Number of rooms
+    ## Número de habitaciones de la vivienda principal
     num_rooms = if_else(NHABIT == -9, NA_integer_, NHABIT),
     
-    ## Consumption units (OECD definition)
+    ## Unidades de consumo (escala OCDE)
     cu_oecd = UC1,
     
-    ## Consumption units (INE definition)
+    ## Unidades de consumo (escala OCDE modificada)
     cu_ine = UC2,
     
-    ## Dummy for one-person households
+    ## Ficticia: una persona sola
     one_person = NMIEMB == 1,
     
-    ## Dummy for households formed by one parent and their children
+    ## Ficticia: un adulto con niños menores de 16 años
     one_parent = TIPHOGAR1 == 4,
 
-    ## Dummy for unemployed primary earner
+    ## Ficticia: sustentador principal desempleado
     unemployed = SITUACTSP == 3,
         
-    ## Dummy for primary earner with post-secondary education
+    ## Ficticia: sustentador principal con estudios superiores
     university = ESTUDREDSP == 4,
     
-    ## Dummy for house ownership 
+    ## Ficticia: vivienda principal es propiedad de la familia
     owner = between(REGTEN, 1, 2),
     
-    ## Annual income
+    ## Ingresos netos anuales del hogar
     income = 12 * IMPEXAC,
 
-    ## Annual income per consumption unit
+    ## Ingresos netos anuales por unidad de consumo
     income_cu = income / cu_oecd,
 
-    ## Weights
+    ## Factores de elevación poblacional
     weight = FACTOR,
     
-    ## Annual expenditures
+    ## Gasto total anual
     expend = GASTOT / FACTOR,
     
-    ## Annual monetary expenditures
+    ## Gasto monetario total anual
     mexpend = GASTMON / FACTOR,
     
-    ## Annual expenditures per consumption unit
+    ## Gasto total anual por unidad de consumo
     expend_cu = expend / cu_oecd,
     
-    ## Annual monetary expenditures
+    ## Gasto total anual por unidad de consumo
     mexpend_cu = mexpend / cu_oecd,
   
   ) 
 
-db19 <- left_join(db19, fuel_exp, by = "NUMERO")
+```
+
+### Base de datos de gastos
+
+Se seleccionan los registros correspondientes a gastos de suministros de energía
+residencial (ECOICOP 04.5):
+
+- `fuel_mexpend`: gastos monetarios anualizados en energía residencial; numérica. 
+- `fuel_expend`: gastos totales anualizados en energía residencial; numérica. 
+- `fuel_cons`: consumos anualizados en energía residencial; numérica. 
+
+```{r expend-transf}
+fuel19 <-  gastos_2019 %>% 
+  filter(code3 == "045") %>%
+  mutate(fuel_mexpend = GASTMON / FACTOR,
+         fuel_expend = GASTO / FACTOR, 
+         fuel_cons = CANTIDAD / FACTOR) %>%
+  select(NUMERO, code2, code3, code4, code5, 
+         fuel_expend, fuel_mexpend, fuel_cons)
+```
+
+Se agregan los gastos de cada familia correspondientes a la vivienda principal:
+```{r expend-aggr}
+main_codes <- c("04511", "04521", "04531", "04541", "04548") 
+
+hh_fuel19 <- fuel19 %>% 
+  filter(code5 %in% main_codes) %>%
+  group_by(NUMERO) %>%
+  summarise(fuel_expend = sum(fuel_expend),
+            fuel_mexpend = sum(fuel_mexpend))
 ```
 
 
+### Fusión de las bases de datos
+
+Se unen las bases de datos de hogares y de gastos en energía en la vivienda principal:
+```{r merge-db}
+db19 <- left_join(hh19, hh_fuel19, by = "NUMERO")
+```
+
+## Algunos resultados
+
+Se eliminan las observaciones cuyo gasto total sea 0 y las que tengan un gasto en energía nulo. Se crean tres nuevas variables:
+
+- `w_fuel`: proporción del gasto monetario total que se destina a energía.
+- `log_expend`: logaritmo del gasto monetario total.
+- `log_cu`: logaritmo del número de unidades de consumo en el hogar.
+
 ```{r}
-db19 %>% filter(income_cu > 0) %>%
-  ggplot(aes(x = income_cu, y = mexpend_cu)) + 
+db19_final <- db19 %>%
+  filter(mexpend > 0, fuel_mexpend > 0) %>%
+  mutate(w_fuel = fuel_mexpend / mexpend,
+         log_expend = log(mexpend),
+         log_cu = log(cu_oecd))
+```
+
+
+Modelo Working-Lesser:
+$$
+w = \alpha + \beta \log x
+$$
+donde $w_i$ es la fracción del gasto dedicado a energía y $x$ es el gasto total. Este modelo permite acomodar bienes de lujo, $\beta > 0$, y bienes de primera necesidad, $\beta < 0$  (Deaton y Muellbauer, 1980, pp. 19--20). Representación gráfica:
+```{r}
+db19_final  %>%
+  ggplot(aes(x = mexpend, y = w_fuel)) + 
     geom_point() +
-    scale_x_log10() +
-    scale_y_log10()
+    scale_x_log10()
 ```
 
+Estimación por MCO:
 ```{r}
-mod1 <- lm(log(mexpend_cu) ~ log(income_cu), data = filter(db19, income_cu > 0))
+mod1 <- lm(w_fuel ~ log_expend, data = db19_final)
 summary(mod1)
+```
+
+Errores típicos robustos a heteroscedasticidad:
+```{r}
+coeftest(mod1, vcov. = vcovHC, type = "HC2")
+```
+
+Regresiones incluyendo características de los hogares:
+```{r}
+mod2 <- lm(w_fuel ~ log_expend + log_cu + 
+             ccaa + rural + owner + old_building + apt_building +
+             one_person + one_parent + unemployed + university + 
+             num_rooms, 
+           data = db19_final)
+summary(mod2)
+coeftest(mod2, vcov. = vcovHC, type = "HC2")
 ```
 
